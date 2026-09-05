@@ -5,13 +5,14 @@ public class GameFlowManager : MonoBehaviour
 {
     [SerializeField]
     private ArrowController arrowController;
+    [SerializeField]
     private ArrowCamera arrowCamera;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    void Awake()
     {
         //이니셜 및 이벤트 구독합시다 
         arrowController.Initialize();
-        arrowCamera.Initialize();
+        arrowCamera.Initialize(arrowController);
         HandleGameStart();
     }
 
