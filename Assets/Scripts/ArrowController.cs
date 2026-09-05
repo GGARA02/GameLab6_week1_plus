@@ -1,8 +1,10 @@
 using System;
+using System.Collections;
 using System.ComponentModel.Design.Serialization;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem.Switch;
+using static UnityEngine.GraphicsBuffer;
 
 public enum ArrowState 
 {
@@ -42,6 +44,8 @@ public class ArrowController : MonoBehaviour
     private float hyperDashCoolTime;
     [Header("BulletTime")]
     [SerializeField]
+    private float startBulletTime;
+    [SerializeField]
     private float bulletTimeSensitivity;
     [SerializeField]
     private float bulletTimeSpeed;
@@ -63,6 +67,8 @@ public class ArrowController : MonoBehaviour
     [Header("Trail")]
     [SerializeField]
     private TrailRenderer trail;
+    [SerializeField]
+    private float rollingTime;
     private float currentSpeed;
     private float remainCoolTime; //남은 쿨타임은 조작불가능 시간과 동일하다.
     private float currentSensitivity;
@@ -83,7 +89,7 @@ public class ArrowController : MonoBehaviour
         remainCoolTime = 0;
         currentSensitivity = sensitivity;
         remainInvincibleTime = 0;
-        remainBulletTime = maxBulletTime;
+        remainBulletTime = startBulletTime;
         yaw = 0;
         pitch = 0;
         arrowState = ArrowState.None;
@@ -107,9 +113,9 @@ public class ArrowController : MonoBehaviour
         hyperDashSpeed += difficultSpeedUp * Time.deltaTime * hyperDashSpeed / speed;
 
         transform.Translate(Vector3.forward * Time.deltaTime * currentSpeed);
-        if (transform.position.y <= 0.0f)
+        if (transform.position.y <= 0.5f)
         {
-            transform.position = new Vector3(transform.position.x, 0.0f, transform.position.z);
+            transform.position = new Vector3(transform.position.x, 0.5f, transform.position.z);
             isOnFloor = true;
         }
         else
@@ -217,22 +223,37 @@ public class ArrowController : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        Debug.Log(other);
-        if (other.tag == "Wall" && remainInvincibleTime <= 0)
+        if (other.CompareTag("Wall") && remainInvincibleTime <= 0)
         {
             OnHitWall?.Invoke();
             remainBulletTime -= bulletWallHit;
-            Mathf.Clamp(remainBulletTime, 0f, maxBulletTime);
+            remainBulletTime = Mathf.Clamp(remainBulletTime, 0f, maxBulletTime);
             remainInvincibleTime = invincibleTime;
-            Debug.Log(other);
         }
-        else if (other.tag == "Ember")
+        else if (other.CompareTag("Ember"))
         {
-            Debug.Log("잔불충돌");
+            Debug.Log("잔불충돌" + other);
             OnLightUp?.Invoke(); //체력 증가하자고!
-            ChangeArrowState(ArrowState.Dash);
+
+            if (arrowState == ArrowState.None)
+            {
+                ChangeArrowState(ArrowState.Dash);
+                currentSensitivity = sensitivity; //수정부
+                currentSpeed = dashSpeed;
+                remainCoolTime = dashCoolTime;
+            }
+            else if (arrowState == ArrowState.HyperDash || arrowState == ArrowState.Dash)
+            {
+                ChangeArrowState(ArrowState.HyperDash);
+                currentSensitivity = sensitivity;
+                currentSpeed = hyperDashSpeed;
+                remainCoolTime = hyperDashCoolTime;
+            }
+
             remainBulletTime += bulletTimeLightUp;
-            Mathf.Clamp(remainBulletTime, 0f, maxBulletTime);
+            remainBulletTime = Mathf.Clamp(remainBulletTime, 0f, maxBulletTime);
+            Destroy(other.gameObject);
+            //StartCoroutine(RollingZ());
         }
     }
 
@@ -258,5 +279,16 @@ public class ArrowController : MonoBehaviour
         }
         pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
         transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
+    }
+
+    private IEnumerator RollingZ()
+    {
+        float count = 0;
+        while (count < rollingTime)
+        {
+            count += Time.deltaTime;
+            transform.rotation = Quaternion.Euler(transform.rotation.x, transform.rotation.y, Mathf.Lerp(0, 360, count / rollingTime));
+            yield return null;
+        }
     }
 }

@@ -56,7 +56,7 @@ public class ArrowCamera : MonoBehaviour
         //lookTarget.x = Mathf.Round(newPosition.x / 0.1f) * 0.1f;
         //lookTarget.y = Mathf.Round(newPosition.y / 0.1f) * 0.1f;
         //lookTarget.z = Mathf.Round(newPosition.z / 0.1f) * 0.1f;
-        Debug.Log(lookTarget);
+        //Debug.Log(lookTarget);
         transform.LookAt(lookTarget);
         cam.fieldOfView = currentFov;
     }
