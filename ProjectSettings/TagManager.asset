@@ -4,10 +4,8 @@
 TagManager:
   serializedVersion: 3
   tags:
-  - Arrow
-  - Body
-  - Head
-  - Enemy
+  - Wall
+  - Ember
   layers:
   - Default
   - TransparentFX

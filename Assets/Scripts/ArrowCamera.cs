@@ -87,7 +87,7 @@ public class ArrowCamera : MonoBehaviour
                 break;
             case ArrowState.Dash:
                 if (fovChangeCoroutine != null) StopCoroutine(fovChangeCoroutine);
-                fovChangeCoroutine = StartCoroutine(FovChangeSmooth(currentFov, dashFOV, 0.2f));
+                fovChangeCoroutine = StartCoroutine(FovChangeSmooth(currentFov, dashFOV, 0.4f));
 
                 if (volumeChangeCoroutine != null) StopCoroutine(volumeChangeCoroutine);
                 volumeChangeCoroutine = StartCoroutine(VolumeChangeSmooth(arrowState));

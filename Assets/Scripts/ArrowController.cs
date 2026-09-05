@@ -50,10 +50,19 @@ public class ArrowController : MonoBehaviour
     [SerializeField]
     private float bulletTimeScale;
     [SerializeField]
-    private float bulletTimeWindowBreak;
+    private float bulletTimeLightUp;
+    [SerializeField]
+    private float bulletWallHit;
+    [SerializeField]
+    private float bulletTimeDiscount;
+    [SerializeField]
+    private float bulletTimeDuringDiscount;
     [Header("Difficult")]
     [SerializeField]
     private float difficultSpeedUp;
+    [Header("Trail")]
+    [SerializeField]
+    private TrailRenderer trail;
     private float currentSpeed;
     private float remainCoolTime; //남은 쿨타임은 조작불가능 시간과 동일하다.
     private float currentSensitivity;
@@ -62,10 +71,12 @@ public class ArrowController : MonoBehaviour
     private float yaw;
     private float pitch;
     private ArrowState arrowState;
+    private bool isOnFloor = false;
 
     public System.Action OnHitWall; //플레이어 히트처리
     public System.Action<ArrowState> OnArrowStateChange; //카메라에서 상태별 연출을 위한 이벤트
-    public System.Action OnHitWindow; //플레이어가 창문을 부술때 이벤트
+    public System.Action OnLightUp; //불씨를 밝히자
+    public System.Action OnGameOver;
     public void Initialize()
     {
         currentSpeed = speed;
@@ -90,19 +101,31 @@ public class ArrowController : MonoBehaviour
         {
             remainInvincibleTime -= Time.deltaTime;
         }
-        if (arrowState == ArrowState.BulletTime)
-        {
-            remainBulletTime -= Time.deltaTime;
-        }
+        remainBulletTime -= Time.deltaTime * bulletTimeDiscount;
         speed += difficultSpeedUp * Time.deltaTime;
         dashSpeed += difficultSpeedUp * Time.deltaTime * dashSpeed / speed;
         hyperDashSpeed += difficultSpeedUp * Time.deltaTime * hyperDashSpeed / speed;
 
         transform.Translate(Vector3.forward * Time.deltaTime * currentSpeed);
+        if (transform.position.y <= 0.0f)
+        {
+            transform.position = new Vector3(transform.position.x, 0.0f, transform.position.z);
+            isOnFloor = true;
+        }
+        else
+        {
+            isOnFloor = false;
+        }
 
         if (arrowState != ArrowState.Dash || arrowState != ArrowState.HyperDash)
         {
-            HandleMouseInput();
+            HandleMouseInput(isOnFloor);
+        }
+
+        trail.time = remainBulletTime;
+        if(remainBulletTime <= 0)
+        {
+            OnGameOver?.Invoke();
         }
     }
 
@@ -116,14 +139,14 @@ public class ArrowController : MonoBehaviour
     {
         if (arrowState == ArrowState.None) 
         {
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                ChangeArrowState(ArrowState.Dash);
-                currentSensitivity = sensitivity; //수정부
-                currentSpeed = dashSpeed;
-                remainCoolTime = dashCoolTime;
-            }
-            else if (Input.GetKeyDown(KeyCode.LeftShift))
+            //if (Input.GetKeyDown(KeyCode.Space))
+            //{
+            //    ChangeArrowState(ArrowState.Dash);
+            //    currentSensitivity = sensitivity; //수정부
+            //    currentSpeed = dashSpeed;
+            //    remainCoolTime = dashCoolTime;
+            //}
+            if (Input.GetKeyDown(KeyCode.LeftShift))
             {
                 ChangeArrowState(ArrowState.BulletTime);
                 currentSensitivity = bulletTimeSensitivity;
@@ -168,7 +191,7 @@ public class ArrowController : MonoBehaviour
             //    remainCoolTime = hyperDashCoolTime;
             //    Time.timeScale = 1;
             //}
-            remainBulletTime -= Time.deltaTime;
+            remainBulletTime -= Time.deltaTime * bulletTimeDiscount * bulletTimeDuringDiscount;
             if (remainBulletTime <= 0)
             {
                 remainBulletTime = 0;
@@ -189,41 +212,49 @@ public class ArrowController : MonoBehaviour
                 remainCoolTime = 0;
             }
         }
+
     }
 
     private void OnTriggerEnter(Collider other)
-    { 
-        if (other.tag == "Enemy" && remainInvincibleTime == 0)
+    {
+        Debug.Log(other);
+        if (other.tag == "Wall" && remainInvincibleTime <= 0)
         {
             OnHitWall?.Invoke();
+            remainBulletTime -= bulletWallHit;
+            Mathf.Clamp(remainBulletTime, 0f, maxBulletTime);
+            remainInvincibleTime = invincibleTime;
+            Debug.Log(other);
         }
-        else if (other.tag == "Window")
+        else if (other.tag == "Ember")
         {
-            OnHitWindow?.Invoke(); //체력 증가하자고!
-            remainBulletTime += bulletTimeWindowBreak;
+            Debug.Log("잔불충돌");
+            OnLightUp?.Invoke(); //체력 증가하자고!
+            ChangeArrowState(ArrowState.Dash);
+            remainBulletTime += bulletTimeLightUp;
             Mathf.Clamp(remainBulletTime, 0f, maxBulletTime);
         }
     }
 
-    private void HandleMouseInput()
+    private void HandleMouseInput(bool isOnFloor)
     {
         float xInput = Input.GetAxis("Mouse X");
         float yInput = Input.GetAxis("Mouse Y");
         if (xInput >= 0)
         {
-            yaw += Mathf.Log((Input.GetAxis("Mouse X") * currentSensitivity) + 1, yawLimitLog);
+            yaw += Mathf.Log((xInput * currentSensitivity) + 1, yawLimitLog);
         }
         else
         {
-            yaw -= Mathf.Log((Input.GetAxis("Mouse X") * currentSensitivity * -1) + 1, yawLimitLog);
+            yaw -= Mathf.Log((xInput * currentSensitivity * -1) + 1, yawLimitLog);
         }
         if (yInput >= 0)
         {
-            pitch -= Mathf.Log((Input.GetAxis("Mouse Y") * currentSensitivity) + 1, pitchLimitLog);
+            pitch -= Mathf.Log((yInput * currentSensitivity) + 1, pitchLimitLog);
         }
-        else
+        else if (!isOnFloor)
         {
-            pitch += Mathf.Log((Input.GetAxis("Mouse Y") * currentSensitivity * -1) + 1, pitchLimitLog);
+            pitch += Mathf.Log((yInput * currentSensitivity * -1) + 1, pitchLimitLog);
         }
         pitch = Mathf.Clamp(pitch, minPitch, maxPitch);
         transform.rotation = Quaternion.Euler(pitch, yaw, 0f);
